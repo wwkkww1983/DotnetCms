@@ -1,0 +1,13 @@
+﻿
+@{
+    ViewData["Title"] = "Register";
+}
+
+<h1>Register</h1>
+
+<form action="/Home/Register" method="post">
+    @Html.AntiForgeryToken()
+    <input type="text" name="username" value="" />
+    <input type="password" name="password" value="" />
+    <button type="submit">注册</button>
+</form>

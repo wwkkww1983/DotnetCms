@@ -1,0 +1,26 @@
+﻿/**
+*┌──────────────────────────────────────────────────────────────┐
+*│　描    述：{Comment}                                                    
+*│　作    者：{Author}                                              
+*│　版    本：1.0   模板代码自动生成                                              
+*│　创建时间：{GeneratorTime}                           
+*└──────────────────────────────────────────────────────────────┘
+*/
+using DotnetCms.Core.Repository;
+using DotnetCms.Models;
+using System;
+using System.Threading.Tasks;
+using FluentValidation;
+
+namespace {FluentValidationNamespace}
+{
+    public class {ModelName}Validation:AbstractValidator<{ModelName}>
+    {
+        public {ModelName}Validation()
+        {
+            CascadeMode = CascadeMode.StopOnFirstFailure;
+{ModelValidation}
+        }
+    }
+}
+
