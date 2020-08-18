@@ -15,6 +15,7 @@ using Dapper;
 using Microsoft.Extensions.Options;
 using System;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace DotnetCms.Repository.SqlServer
 {
@@ -47,6 +48,21 @@ namespace DotnetCms.Repository.SqlServer
                 Ids = ids
             });
         }
+
+        /// <summary>
+        /// 通过角色主键获取菜单主键数组
+        /// </summary>
+        /// <param name="RoleId"></param>
+        /// <returns></returns>
+        public int[] GetIdsByRoleId(int RoleId)
+        {
+            string sql = "select MenuId from RolePermission where RoleId=@RoleId";
+            return _dbConnection.Query<int>(sql, new
+            {
+                RoleId = RoleId
+            }).ToArray();
+        }
+
 
     }
 }

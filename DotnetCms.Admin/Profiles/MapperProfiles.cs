@@ -13,7 +13,11 @@
 
 using AutoMapper;
 using DotnetCms.Models;
+using DotnetCms.ViewModels.Article;
+using DotnetCms.ViewModels.Manager;
 using DotnetCms.ViewModels.ManagerRole;
+using DotnetCms.ViewModels.Menu;
+using DotnetCms.ViewModels.TaskInfo;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,8 +31,28 @@ namespace DotnetCms.Admin.Profiles
         {
             #region ManagerRole
             CreateMap<ManagerRoleAddOrModifyModel, ManagerRole>();
+            CreateMap<ManagerRole, ManagerRoleListModel>();
+
             #endregion
-           
+            #region Manager
+            CreateMap<Manager, ManagerListModel>();
+            CreateMap<ManagerAddOrModifyModel, Manager>();
+            CreateMap<ChangeInfoModel, Manager>();
+            #endregion
+            #region Menu
+            CreateMap<MenuAddOrModifyModel, Menu>();
+            CreateMap<Menu, MenuNavView>();
+            #endregion
+
+            #region TaskInfo
+            CreateMap<TaskInfoAddOrModifyModel, TaskInfo>();
+            CreateMap<TaskInfo, TaskInfoDto>();
+            #endregion
+
+            #region Article
+            CreateMap<Article, ArticleListModel>();
+            #endregion
+
         }
     }
 }

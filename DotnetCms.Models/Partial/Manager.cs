@@ -19,6 +19,10 @@ namespace DotnetCms.Models
 	/// </summary>
 	public partial class Manager
 	{
-
+		/// <summary>
+		/// 角色名称
+		/// </summary>
+		[NotMapped]
+		public String RoleName { get; set; }
 	}
 }

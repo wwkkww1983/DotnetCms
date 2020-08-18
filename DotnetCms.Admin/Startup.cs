@@ -2,10 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
+using AutoMapper;
 using DotnetCms.Admin.Filter;
 using DotnetCms.Admin.Validation;
 using DotnetCms.Core.Options;
+using DotnetCms.IServices;
+using DotnetCms.Quartz;
+using DotnetCms.Repository.SqlServer;
+using DotnetCms.Services;
+using DotnetCms.ViewModels.TaskInfo;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -32,16 +41,29 @@ namespace DotnetCms.Admin
         public IConfiguration Configuration { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
-        public void ConfigureServices(IServiceCollection services)
+        public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.Configure<DbOption>("DotnetCmsOption", Configuration.GetSection("DbOpion"));
-            services.AddMemoryCache();
+            services.AddMemoryCache();//使用缓存 
 
             services.Configure<CookiePolicyOptions>(options =>
             {
                 // This lambda determines whether user consent for non-essential cookies is needed for a given request.
                 options.CheckConsentNeeded = context => true;
                 options.MinimumSameSitePolicy = SameSiteMode.None;
+            });
+
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+           .AddCookie(options =>
+           {
+               options.LoginPath = "/Account/Index";
+               options.LogoutPath = "/Account/Logout";
+               options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+           });
+            services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(5);
+                options.Cookie.HttpOnly = true;
             });
 
             services.AddAntiforgery(options =>
@@ -63,11 +85,30 @@ namespace DotnetCms.Admin
                   fv.RegisterValidatorsFromAssemblyContaining<ManagerRoleValidation>();
                   //去掉其他的验证，只使用FluentValidation的验证规则
                   fv.RunDefaultMvcValidationAfterFluentValidationExecutes = false;
-              }); ;
+              });
+
+            //DI了AutoMapper中需要用到的服务，其中包括AutoMapper的配置类 Profile
+            services.AddAutoMapper();
+
+            //DI调度中心
+            services.AddSingleton<ScheduleCenter>();
+
+            //Autofac接管DI 
+            var builder = new ContainerBuilder();
+            builder.Populate(services);
+            builder.RegisterAssemblyTypes(typeof(ManagerRoleRepository).Assembly)
+                   .Where(t => t.Name.EndsWith("Repository"))
+                   .AsImplementedInterfaces();
+            builder.RegisterAssemblyTypes(typeof(ManagerRoleService).Assembly)
+                 .Where(t => t.Name.EndsWith("Service"))
+                 .AsImplementedInterfaces();
+
+            return new AutofacServiceProvider(builder.Build());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env,ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env,ILoggerFactory loggerFactory
+            , IApplicationLifetime applicationLifetime)
         {
             if (env.IsDevelopment())
             {
@@ -79,20 +120,54 @@ namespace DotnetCms.Admin
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+
             try
             {
-                int b = 1;
-                int a = b / 0;
+                var jobInfoAppService = app.ApplicationServices.GetRequiredService<ITaskInfoService>();
+                var scheduleCenter = app.ApplicationServices.GetRequiredService<ScheduleCenter>();
+                applicationLifetime.ApplicationStarted.Register(async () =>
+                {
+                    var list = await jobInfoAppService.GetListByJobStatuAsync((int)TaskInfoStatus.SystemStopped);
+                    if (list?.Count() > 0)
+                    {
+                        list.ForEach(async x =>
+                        {
+                            await scheduleCenter.AddJobAsync(x.Name,
+                                                    x.Group,
+                                                    x.ClassName,
+                                                    x.Assembly,
+                                                    x.Cron);
+                        });
+                        await jobInfoAppService.ResumeSystemStoppedAsync();
+                    }
+
+                });
+                applicationLifetime.ApplicationStopping.Register(async () =>
+                {
+                    var list = await jobInfoAppService.GetListByJobStatuAsync((int)TaskInfoStatus.Running);
+                    if (list?.Count() > 0)
+                    {
+                        await jobInfoAppService.SystemStoppedAsync();
+                        list.ForEach(async x =>
+                        {
+                            await scheduleCenter.DeleteJobAsync(x.Name, x.Group);
+                        });
+                    }
+
+
+                });
             }
             catch (Exception ex)
             {
+
                 logger.Error(ex, nameof(Startup));
             }
-
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCookiePolicy();
+            app.UseSession();
+            app.UseAuthentication();
 
             //add NLog to ASP.NET Core
             loggerFactory.AddNLog();

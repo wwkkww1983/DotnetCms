@@ -7,6 +7,8 @@
 
 
   <ItemGroup>
+    <PackageReference Include="Autofac" Version="5.2.0" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="6.0.0" />
     <PackageReference Include="AutoMapper" Version="8.0.0" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="6.0.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="8.1.2" />
@@ -23,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DotnetCms.Core\DotnetCms.Core.csproj" />
+    <ProjectReference Include="..\DotnetCms.Repository.SqlServer\DotnetCms.Repository.SqlServer.csproj" />
     <ProjectReference Include="..\DotnetCms.Services\DotnetCms.Services.csproj" />
     <ProjectReference Include="..\DotnetCms.ViewModels\DotnetCms.ViewModels.csproj" />
   </ItemGroup>

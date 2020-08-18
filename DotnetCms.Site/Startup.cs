@@ -2,7 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
+using AutoMapper;
 using DotnetCms.Core.Options;
+using DotnetCms.Repository.SqlServer;
 using DotnetCms.Services;
 using DotnetCms.Site.Filter;
 using Microsoft.AspNetCore.Builder;
@@ -14,7 +18,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NLog;
+using NLog.Extensions.Logging;
 using NLog.Web;
 
 namespace DotnetCms.Site
@@ -31,7 +37,7 @@ namespace DotnetCms.Site
         public IConfiguration Configuration { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
-        public void ConfigureServices(IServiceCollection services)
+        public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.Configure<DbOption>("DotnetCmsOption", Configuration.GetSection("DbOpion"));
             services.AddMemoryCache();
@@ -47,6 +53,13 @@ namespace DotnetCms.Site
             {
                 config.Cookie.Name = "Identity.Cooke";
                 config.LoginPath = "/Home/Login";
+            });
+
+           
+            services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(5);
+                options.Cookie.HttpOnly = true;
             });
 
             services.AddDbContext<AppDbContext>(config => {
@@ -73,10 +86,26 @@ namespace DotnetCms.Site
             {
                 option.Filters.Add(new GlobalExceptionFilter());
             }).SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            //DI了AutoMapper中需要用到的服务，其中包括AutoMapper的配置类 Profile
+            services.AddAutoMapper();
+            //services.AddSingleton<ScheduleCenter>();
+
+            //Autofac接管DI 
+            var builder = new ContainerBuilder();
+            builder.Populate(services);
+            builder.RegisterAssemblyTypes(typeof(ManagerRoleRepository).Assembly)
+                   .Where(t => t.Name.EndsWith("Repository"))
+                   .AsImplementedInterfaces();
+            builder.RegisterAssemblyTypes(typeof(ManagerRoleService).Assembly)
+                 .Where(t => t.Name.EndsWith("Service"))
+                 .AsImplementedInterfaces();
+
+            return new AutofacServiceProvider(builder.Build());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
             if (env.IsDevelopment())
             {
@@ -102,7 +131,11 @@ namespace DotnetCms.Site
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCookiePolicy();
+           
+            app.UseSession();
             app.UseAuthentication();
+            //add NLog to ASP.NET Core
+            loggerFactory.AddNLog();
 
             app.UseMvc(routes =>
             {
